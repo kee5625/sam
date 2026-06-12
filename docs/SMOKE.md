@@ -14,9 +14,15 @@ Run after any change to OS glue (hotkeys, windows, capture, mic). `npm run dev` 
 - [ ] Unplugging/denying mic shows error toast; typing still works
 
 ## Commands
-- [ ] "open spotify" launches Spotify
+- [ ] "open spotify" launches Spotify (via Settings → Custom apps if not in Start Menu)
 - [ ] "open spotty" (typo) shows 3 suggestions; clicking one launches it
+- [ ] Unmatched app with no close suggestions shows "add custom app" hint
 - [ ] "open leetcode.com and neetcode.io" opens both in one Chrome window
+
+## Overlay interactivity
+- [ ] Expanded panel: scroll/clicks BELOW the panel (in the invisible window area) reach the app underneath
+- [ ] Idle pill is clickable and expands the overlay
+- [ ] Long streamed answer (>30s, e.g. "write a 2000 word essay") completes without aborting
 
 ## Sessions
 - [ ] With Chrome opened BY SAM: "save this as test mode" lists apps + tabs, Save persists
