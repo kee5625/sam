@@ -7,6 +7,7 @@ interface Cfg {
   hotkeys: { toggleOverlay: string; pushToTalk: string; snip: string }
   launchAtStartup: boolean
   micDeviceId: string | null
+  customApps: { name: string; path: string }[]
 }
 
 interface SessionData { apps: string[]; tabs: string[][] }
@@ -31,7 +32,13 @@ export default function Settings(): JSX.Element {
   if (!cfg) return <div className="page">Loading…</div>
 
   async function save(): Promise<void> {
-    const failed = (await window.sam.invoke('config:set', cfg)) as string[]
+    if (!cfg) return
+    const cleaned: Cfg = {
+      ...cfg,
+      customApps: cfg.customApps.filter((a) => a.name.trim() && a.path.trim())
+    }
+    const failed = (await window.sam.invoke('config:set', cleaned)) as string[]
+    setCfg(cleaned)
     setFailedKeys(failed)
     setMsg(failed.length ? '' : 'Saved')
     setTimeout(() => setMsg(''), 2000)
@@ -86,6 +93,47 @@ export default function Settings(): JSX.Element {
         </div>
       </div>
       {failedKeys.length > 0 && <div className="err">In use by another app: {failedKeys.join(', ')} — pick different bindings</div>}
+
+      <h2>Custom apps</h2>
+      <p className="note">Apps Sam can't find in the Start Menu — point at the .exe directly. Name is what you'll say ("open spotify").</p>
+      {cfg.customApps.map((a, i) => (
+        <div className="row" key={i} style={{ alignItems: 'flex-end' }}>
+          <div>
+            <label>Name</label>
+            <input
+              value={a.name}
+              placeholder="spotify"
+              onChange={(e) => {
+                const next = [...cfg.customApps]
+                next[i] = { ...next[i], name: e.target.value }
+                setCfg({ ...cfg, customApps: next })
+              }}
+            />
+          </div>
+          <div style={{ flex: 2 }}>
+            <label>Exe path</label>
+            <input
+              value={a.path}
+              placeholder="C:\Users\you\AppData\Roaming\Spotify\Spotify.exe"
+              onChange={(e) => {
+                const next = [...cfg.customApps]
+                next[i] = { ...next[i], path: e.target.value }
+                setCfg({ ...cfg, customApps: next })
+              }}
+            />
+          </div>
+          <button
+            className="danger"
+            style={{ marginTop: 0 }}
+            onClick={() => setCfg({ ...cfg, customApps: cfg.customApps.filter((_, j) => j !== i) })}
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+      <button onClick={() => setCfg({ ...cfg, customApps: [...cfg.customApps, { name: '', path: '' }] })}>
+        Add app
+      </button>
 
       <h2>General</h2>
       <label>Microphone</label>

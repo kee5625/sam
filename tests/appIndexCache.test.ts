@@ -39,6 +39,23 @@ describe('loadAppIndex', () => {
     expect(fetcher).toHaveBeenCalledOnce()
   })
 
+  it('does not cache an empty fetch result', async () => {
+    const { existsSync } = await import('fs')
+    const fetcher = vi.fn(async () => [])
+    const result = await loadAppIndex(dir, fetcher)
+    expect(result).toEqual([])
+    expect(existsSync(join(dir, 'app-index.json'))).toBe(false)
+  })
+
+  it('prefers stale cache over an empty fetch result', async () => {
+    writeFileSync(
+      join(dir, 'app-index.json'),
+      JSON.stringify({ updated: 0, apps: FRESH })
+    )
+    const result = await loadAppIndex(dir, vi.fn(async () => []))
+    expect(result).toEqual(FRESH)
+  })
+
   it('falls back to stale cache if fetcher throws', async () => {
     writeFileSync(
       join(dir, 'app-index.json'),

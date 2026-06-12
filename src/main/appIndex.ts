@@ -75,13 +75,17 @@ export async function loadAppIndex(
       cached = null
     }
   }
-  if (cached && Date.now() - cached.updated < CACHE_TTL_MS) return cached.apps
+  if (cached && Date.now() - cached.updated < CACHE_TTL_MS && cached.apps.length > 0) {
+    return cached.apps
+  }
   try {
     const apps = await fetcher()
+    // never cache an empty result — a transient PowerShell failure would
+    // otherwise kill app launching for a whole day
+    if (apps.length === 0) return cached?.apps ?? []
     writeFileSync(cacheFile, JSON.stringify({ updated: Date.now(), apps }))
     return apps
   } catch {
-    if (cached) return cached.apps
-    return []
+    return cached?.apps ?? []
   }
 }

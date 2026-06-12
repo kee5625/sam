@@ -17,6 +17,32 @@ interface Suggestion {
   appId: string
 }
 
+function MicIcon(): JSX.Element {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <rect x="9" y="2" width="6" height="12" rx="3" />
+      <path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4" />
+    </svg>
+  )
+}
+
+function StopIcon(): JSX.Element {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+      <rect x="6" y="6" width="12" height="12" rx="2" />
+    </svg>
+  )
+}
+
+function GearIcon(): JSX.Element {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  )
+}
+
 export default function App(): JSX.Element {
   const [mode, setMode] = useState<Mode>('idle')
   const [listening, setListening] = useState(false)
@@ -30,24 +56,26 @@ export default function App(): JSX.Element {
   const [suggestions, setSuggestions] = useState<{ query: string; apps: Suggestion[] } | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const recorder = useRef(new Recorder())
-
-  const setInteractive = useCallback((on: boolean) => {
-    void window.sam.invoke('overlay:set-interactive', on)
-  }, [])
+  const interactiveRef = useRef(false)
 
   const expand = useCallback(() => {
     setMode('expanded')
-    setInteractive(true)
+    // interactive immediately so the input can take keyboard focus;
+    // the mousemove tracker corrects mouse pass-through from here on
+    interactiveRef.current = true
+    void window.sam.invoke('overlay:set-interactive', true)
+    void window.sam.invoke('overlay:focus')
     setTimeout(() => inputRef.current?.focus(), 50)
-  }, [setInteractive])
+  }, [])
 
   const collapse = useCallback(() => {
     setMode('idle')
-    setInteractive(false)
+    interactiveRef.current = false
+    void window.sam.invoke('overlay:set-interactive', false)
     setError('')
     setSuggestions(null)
     setConfirm(null)
-  }, [setInteractive])
+  }, [])
 
   const submit = useCallback(async (text: string) => {
     if (!text.trim() || busy) return
@@ -79,7 +107,8 @@ export default function App(): JSX.Element {
       }
     } else {
       try {
-        await recorder.current.start()
+        const cfg = (await window.sam.invoke('config:get')) as { micDeviceId: string | null }
+        await recorder.current.start(cfg.micDeviceId)
         setListening(true)
         setStatus('Listening… (Alt+S to stop)')
       } catch {
@@ -87,6 +116,21 @@ export default function App(): JSX.Element {
       }
     }
   }, [listening, submit])
+
+  // Hover-tracked interactivity: the window itself stays click-through
+  // (mouse events forwarded); only the visible pill/panel grabs the mouse.
+  // Scroll and clicks anywhere else fall through to the apps below.
+  useEffect(() => {
+    const onMove = (e: MouseEvent): void => {
+      const over = !!(e.target as HTMLElement).closest?.('.panel, .pill')
+      if (over !== interactiveRef.current) {
+        interactiveRef.current = over
+        void window.sam.invoke('overlay:set-interactive', over)
+      }
+    }
+    document.addEventListener('mousemove', onMove)
+    return () => document.removeEventListener('mousemove', onMove)
+  }, [])
 
   useEffect(() => {
     const offHotkey = window.sam.on('hotkey', (...args: unknown[]) => {
@@ -163,11 +207,21 @@ export default function App(): JSX.Element {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') void submit(input) }}
           />
-          <button className={`micBtn${listening ? ' rec' : ''}`} onClick={() => void toggleVoice()}>
-            {listening ? '■' : '🎤'}
+          <button
+            className={`micBtn${listening ? ' rec' : ''}`}
+            title={listening ? 'Stop recording' : 'Voice input'}
+            onClick={() => void toggleVoice()}
+          >
+            {listening ? <StopIcon /> : <MicIcon />}
           </button>
-          <button className="clearBtn" onClick={() => void window.sam.invoke('settings:open')}>⚙</button>
+          <button className="clearBtn" title="Settings" onClick={() => void window.sam.invoke('settings:open')}>
+            <GearIcon />
+          </button>
         </div>
+
+        {busy && !response && (
+          <div className="dots"><span /><span /><span /></div>
+        )}
 
         {response && (
           <div className="response" dangerouslySetInnerHTML={{ __html: marked.parse(response) as string }} />
@@ -175,14 +229,20 @@ export default function App(): JSX.Element {
 
         {suggestions && (
           <div className="confirmBox">
-            No app matched "{suggestions.query}". Did you mean:
-            <div>
-              {suggestions.apps.map((a) => (
-                <button key={a.appId} className="sugBtn" onClick={() => void submit(`open ${a.name}`)}>
-                  {a.name}
-                </button>
-              ))}
-            </div>
+            {suggestions.apps.length > 0 ? (
+              <>
+                No app matched "{suggestions.query}". Did you mean:
+                <div>
+                  {suggestions.apps.map((a) => (
+                    <button key={a.appId} className="sugBtn" onClick={() => void submit(`open ${a.name}`)}>
+                      {a.name}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>No app called "{suggestions.query}" found. If it's not in the Start Menu, add its .exe under Settings → Custom apps.</>
+            )}
           </div>
         )}
 

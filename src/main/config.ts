@@ -7,7 +7,8 @@ export const DEFAULT_CONFIG: SamConfig = {
   openaiApiKey: '',
   hotkeys: { toggleOverlay: 'Alt+Space', pushToTalk: 'Alt+S', snip: 'Alt+Q' },
   launchAtStartup: false,
-  micDeviceId: null
+  micDeviceId: null,
+  customApps: []
 }
 
 export class ConfigStore {
@@ -25,7 +26,8 @@ export class ConfigStore {
       return {
         ...DEFAULT_CONFIG,
         ...raw,
-        hotkeys: { ...DEFAULT_CONFIG.hotkeys, ...(raw.hotkeys ?? {}) }
+        hotkeys: { ...DEFAULT_CONFIG.hotkeys, ...(raw.hotkeys ?? {}) },
+        customApps: Array.isArray(raw.customApps) ? raw.customApps : []
       }
     } catch {
       return { ...DEFAULT_CONFIG }

@@ -1,6 +1,6 @@
 import { ipcMain, BrowserWindow, app } from 'electron'
 import { join } from 'path'
-import type { AssistantEvent, SamConfig, Intent } from '../shared/types'
+import type { AssistantEvent, SamConfig, Intent, AppEntry, ChatMessage } from '../shared/types'
 import { ConfigStore } from './config'
 import { loadAppIndex, findApp } from './appIndex'
 import { launchApp } from './launcher'
@@ -46,11 +46,20 @@ export function setupIpc(ctx: IpcContext): { config: ConfigStore } {
     ctx.overlay.webContents.send('assistant:event', ev)
   }
 
+  /** Start Menu index + user-defined custom apps (exe paths). */
+  async function allApps(): Promise<AppEntry[]> {
+    const apps = await loadAppIndex(dataDir)
+    const custom = config.load().customApps
+      .filter((c) => c.name && c.path)
+      .map((c) => ({ name: c.name, appId: `exe:${c.path}` }))
+    return [...custom, ...apps]
+  }
+
   const sessionDeps: SessionDeps = {
     listVisibleApps,
     readTabs: () => readOpenTabs(),
     launchApp: async (name) => {
-      const apps = await loadAppIndex(dataDir)
+      const apps = await allApps()
       const { match } = findApp(name, apps)
       if (!match) return { ok: false, error: 'no matching app' }
       launchApp(match.appId)
@@ -63,10 +72,10 @@ export function setupIpc(ctx: IpcContext): { config: ConfigStore } {
     }
   }
 
-  async function executeIntent(intent: Intent, originalText: string): Promise<void> {
+  async function executeIntent(intent: Intent, originalText: string, past: ChatMessage[]): Promise<void> {
     switch (intent.type) {
       case 'open_app': {
-        const apps = await loadAppIndex(dataDir)
+        const apps = await allApps()
         const { match, suggestions } = findApp(intent.name, apps)
         if (match) {
           launchApp(match.appId)
@@ -111,7 +120,7 @@ export function setupIpc(ctx: IpcContext): { config: ConfigStore } {
       case 'answer': {
         const messages = [
           { role: 'system' as const, content: 'You are Sam, a concise helpful desktop assistant.' },
-          ...history.recent(6),
+          ...past,
           { role: 'user' as const, content: originalText }
         ]
         let answer = ''
@@ -127,6 +136,9 @@ export function setupIpc(ctx: IpcContext): { config: ConfigStore } {
 
   ipcMain.handle('submit', async (_e, text: string) => {
     try {
+      // snapshot history BEFORE adding the new message, so the model
+      // doesn't see the current question twice
+      const past = history.recent(6)
       history.add('user', text)
       if (attachedImage) {
         if (!openai.hasKey()) {
@@ -142,10 +154,10 @@ export function setupIpc(ctx: IpcContext): { config: ConfigStore } {
         emit({ kind: 'done' })
         return
       }
-      const intent = await parseIntent(text, history.recent(6), (m, tools) =>
+      const intent = await parseIntent(text, past, (m, tools) =>
         router.chat(m, tools ?? INTENT_TOOLS)
       )
-      await executeIntent(intent, text)
+      await executeIntent(intent, text, past)
       emit({ kind: 'done' })
     } catch (e) {
       emit({ kind: 'error', text: e instanceof Error ? e.message : String(e), retryable: true })
@@ -181,8 +193,9 @@ export function setupIpc(ctx: IpcContext): { config: ConfigStore } {
 
   ipcMain.handle('overlay:set-interactive', (_e, interactive: boolean) => {
     ctx.overlay.setIgnoreMouseEvents(!interactive, { forward: true })
-    if (interactive) ctx.overlay.focus()
   })
+
+  ipcMain.handle('overlay:focus', () => ctx.overlay.focus())
 
   ipcMain.handle('image:clear', () => { attachedImage = null })
 

@@ -4,6 +4,8 @@ export interface SamConfig {
   hotkeys: { toggleOverlay: string; pushToTalk: string; snip: string }
   launchAtStartup: boolean
   micDeviceId: string | null
+  /** Apps not in the Start Menu index — launched directly by exe path */
+  customApps: { name: string; path: string }[]
 }
 
 export interface AppEntry {
