@@ -1,0 +1,66 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: transparent; overflow: hidden; font-family: 'Segoe UI', system-ui, sans-serif; }
+
+.wrap { display: flex; flex-direction: column; align-items: center; padding-top: 4px; }
+
+.pill {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(20, 22, 30, 0.78);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 6px 16px;
+  color: #e8eaf0; font-size: 13px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; }
+.dot.listening { background: #f87171; animation: pulse 1s infinite; }
+@keyframes pulse { 50% { opacity: 0.3; } }
+
+.panel {
+  width: 640px;
+  background: rgba(20, 22, 30, 0.85);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  padding: 10px 14px;
+  color: #e8eaf0;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+}
+.inputRow { display: flex; align-items: center; gap: 8px; }
+.inputRow input {
+  flex: 1; background: transparent; border: none; outline: none;
+  color: #e8eaf0; font-size: 14px; padding: 6px 2px;
+}
+.inputRow input::placeholder { color: rgba(232, 234, 240, 0.4); }
+.micBtn, .clearBtn {
+  background: rgba(255, 255, 255, 0.08); border: none; border-radius: 8px;
+  color: #e8eaf0; padding: 5px 9px; cursor: pointer; font-size: 12px;
+}
+.micBtn.rec { background: rgba(248, 113, 113, 0.35); }
+
+.thumb { max-height: 56px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); }
+.attachRow { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+
+.response {
+  margin-top: 8px; padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 13px; line-height: 1.55;
+  max-height: 38vh; overflow-y: auto;
+  word-break: break-word;
+}
+.response :is(p, ul, ol, pre) { margin-bottom: 8px; }
+.response pre { background: rgba(0,0,0,0.4); padding: 8px; border-radius: 8px; overflow-x: auto; }
+.response code { font-family: Consolas, monospace; font-size: 12px; }
+
+.status { font-size: 11px; opacity: 0.55; margin-top: 6px; }
+.error { color: #fca5a5; }
+.sugBtn {
+  display: inline-block; margin: 4px 6px 0 0; padding: 4px 10px;
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px; color: #e8eaf0; cursor: pointer; font-size: 12px;
+}
+.confirmBox { margin-top: 8px; font-size: 12px; }
+.confirmBox ul { margin: 4px 0 8px 16px; }
