@@ -62,8 +62,7 @@ export function setupIpc(ctx: IpcContext): { config: ConfigStore } {
       const apps = await allApps()
       const { match } = findApp(name, apps)
       if (!match) return { ok: false, error: 'no matching app' }
-      launchApp(match.appId)
-      return { ok: true }
+      return launchApp(match.appId)
     },
     openTabGroup: (urls) => openTabGroup(urls),
     isRunning: async (name) => {
@@ -78,8 +77,10 @@ export function setupIpc(ctx: IpcContext): { config: ConfigStore } {
         const apps = await allApps()
         const { match, suggestions } = findApp(intent.name, apps)
         if (match) {
-          launchApp(match.appId)
-          emit({ kind: 'result', text: `Opening **${match.name}**` })
+          const r = launchApp(match.appId)
+          emit(r.ok
+            ? { kind: 'result', text: `Opening **${match.name}**` }
+            : { kind: 'error', text: r.error ?? 'Launch failed', retryable: false })
         } else {
           emit({ kind: 'suggestions', query: intent.name, apps: suggestions })
         }

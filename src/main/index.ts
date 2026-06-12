@@ -4,6 +4,10 @@ import { registerHotkeys } from './hotkeys'
 import { setupIpc } from './ipc'
 import { captureScreen } from './capture'
 
+// Last-resort guard: a stray async error (e.g. a bad spawn) should log,
+// not kill the assistant with a dialog box
+process.on('uncaughtException', (e) => console.error('[sam] uncaught:', e))
+
 let overlay: BrowserWindow | null = null
 let snip: BrowserWindow | null = null
 let settings: BrowserWindow | null = null
