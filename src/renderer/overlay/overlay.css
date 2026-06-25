@@ -3,23 +3,51 @@ body { background: transparent; overflow: hidden; font-family: 'Segoe UI', syste
 
 .wrap { display: flex; flex-direction: column; align-items: center; padding-top: 4px; }
 
-.pill {
-  display: flex; align-items: center; gap: 8px;
-  background: rgba(20, 22, 30, 0.78);
-  backdrop-filter: blur(12px);
+/* Compact voice listening bar */
+.listening {
+  display: flex; align-items: center; gap: 12px;
+  background: rgba(20, 22, 30, 0.85);
+  backdrop-filter: blur(14px);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 999px;
-  padding: 6px 16px;
+  padding: 9px 18px;
   color: #e8eaf0; font-size: 13px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-  cursor: pointer;
-  -webkit-app-region: no-drag;
-  transition: transform 0.12s ease, background 0.12s ease;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+  animation: slideIn 0.16s ease;
 }
-.pill:hover { transform: scale(1.04); background: rgba(30, 33, 44, 0.88); }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; }
-.dot.listening { background: #f87171; animation: pulse 1s infinite; }
-@keyframes pulse { 50% { opacity: 0.3; } }
+.listenLabel { opacity: 0.85; }
+.eq { display: flex; align-items: center; gap: 3px; height: 18px; }
+.eq span {
+  width: 3px; height: 100%; border-radius: 2px;
+  background: #f87171;
+  animation: eq 1s ease-in-out infinite;
+}
+.eq span:nth-child(1) { animation-delay: 0s; }
+.eq span:nth-child(2) { animation-delay: 0.15s; }
+.eq span:nth-child(3) { animation-delay: 0.3s; }
+.eq span:nth-child(4) { animation-delay: 0.45s; }
+.eq span:nth-child(5) { animation-delay: 0.6s; }
+@keyframes eq { 0%, 100% { transform: scaleY(0.3); } 50% { transform: scaleY(1); } }
+
+/* Brief command confirmation */
+.toast {
+  display: flex; align-items: center; gap: 9px;
+  background: rgba(20, 22, 30, 0.85);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  padding: 9px 16px;
+  color: #e8eaf0; font-size: 13px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+  animation: slideIn 0.16s ease;
+}
+.toast .check {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #4ade80; color: #16181f; font-size: 12px; font-weight: 700;
+}
+.toast.err { border-color: rgba(248, 113, 113, 0.4); }
+.toast.err .check { background: #f87171; }
 
 .panel {
   width: 640px;
