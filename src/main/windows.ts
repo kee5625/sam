@@ -29,6 +29,7 @@ export function createOverlayWindow(): BrowserWindow {
     skipTaskbar: true,
     alwaysOnTop: true,
     hasShadow: false,
+    show: false,
     webPreferences: { preload }
   })
   win.setAlwaysOnTop(true, 'screen-saver')
