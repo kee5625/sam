@@ -23,10 +23,11 @@ function score(query: string, name: string): number {
   if (n.includes(q)) return 60
   const qTokens = q.split(/\s+/)
   const nTokens = n.split(/\s+/)
-  // each query token must prefix a name token, or be an acronym of name tokens
-  // ("vs code" -> initials "vsc" covers "vs", "code" prefixes "code")
+  // each query token must prefix a name token, or be a multi-char acronym of
+  // name tokens ("vs code" -> initials "vsc" covers "vs", "code" prefixes "code").
+  // require acronym length >= 2 so a single stray letter can't match everything.
   const initials = nTokens.map((w) => w[0]).join('')
-  if (qTokens.every((t) => nTokens.some((w) => w.startsWith(t)) || initials.includes(t))) return 50
+  if (qTokens.every((t) => nTokens.some((w) => w.startsWith(t)) || (t.length >= 2 && initials.includes(t)))) return 50
   // weak: any shared token prefix at all (suggestion-only territory)
   if (qTokens.some((t) => nTokens.some((w) => w.startsWith(t.slice(0, 3)) && t.length >= 3))) return 20
   return 0

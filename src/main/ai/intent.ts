@@ -53,9 +53,15 @@ export const INTENT_TOOLS = [
 ]
 
 const SYSTEM_PROMPT = `You are Sam, a Windows desktop assistant.
-Decide whether the user's message is a command (use a tool) or a question/chat (no tool).
+Decide whether the user's LATEST message is a command (use a tool) or a question/chat (no tool).
 Commands: opening apps, opening websites/urls, opening or saving named workflow sessions.
 "open X mode" or "start X mode" refers to a saved session named "X mode".
+
+Critical rules for tool arguments:
+- Extract app/session names ONLY from the user's latest message. Copy the exact word(s) the user said.
+- NEVER substitute, guess, or reuse a name from earlier messages in the conversation. If the latest message says "open zybatron", the app name is "zybatron" — not some app mentioned earlier.
+- Earlier turns are background only; they must not change the name you extract from the current command.
+
 If the user asks a question or chats, do NOT call a tool — just answer.`
 
 export type IntentChatFn = (
