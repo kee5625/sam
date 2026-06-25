@@ -198,12 +198,15 @@ export function setupIpc(ctx: IpcContext): { config: ConfigStore } {
 
   ipcMain.handle('overlay:focus', () => ctx.overlay.focus())
 
+  ipcMain.handle('overlay:hide', () => ctx.overlay.hide())
+
   ipcMain.handle('image:clear', () => { attachedImage = null })
 
   ipcMain.handle('snip:start', () => ctx.openSnip())
   ipcMain.handle('snip:done', (_e, dataUrl: string) => {
     attachedImage = dataUrl
     ctx.closeSnip()
+    ctx.overlay.show()
     ctx.overlay.webContents.send('snip:attached', dataUrl)
   })
   ipcMain.handle('snip:cancel', () => ctx.closeSnip())
