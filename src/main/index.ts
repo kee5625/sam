@@ -52,8 +52,21 @@ app.whenReady().then(() => {
 
   function doRegister(): string[] {
     return registerHotkeys(config.load().hotkeys, {
-      toggleOverlay: () => overlay?.webContents.send('hotkey', 'toggleOverlay'),
-      pushToTalk: () => overlay?.webContents.send('hotkey', 'pushToTalk'),
+      toggleOverlay: () => {
+        if (!overlay) return
+        // Alt+Space toggles: hide if showing, else summon the type box
+        if (overlay.isVisible()) {
+          overlay.hide()
+        } else {
+          overlay.show()
+          overlay.webContents.send('hotkey', 'toggleOverlay')
+        }
+      },
+      pushToTalk: () => {
+        if (!overlay) return
+        overlay.show()
+        overlay.webContents.send('hotkey', 'pushToTalk')
+      },
       snip: () => void openSnip()
     })
   }
