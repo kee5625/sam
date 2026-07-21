@@ -10,6 +10,10 @@ export default function Snip(): JSX.Element {
   const imgRef = useRef<HTMLImageElement>(null)
 
   useEffect(() => {
+    void window.sam.invoke('config:get').then((c) => {
+      const accent = (c as { accent?: string }).accent === 'green' ? 'green' : 'blue'
+      document.documentElement.setAttribute('data-accent', accent)
+    })
     const off = window.sam.on('snip:show', (...args: unknown[]) => setShot(args[0] as string))
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') void window.sam.invoke('snip:cancel')
@@ -60,9 +64,21 @@ export default function Snip(): JSX.Element {
       <img ref={imgRef} className="shot" src={shot} alt="" draggable={false} />
       {!rect && <div className="dim" />}
       {rect && (
-        <div className="rect" style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }} />
+        <div className="rect" style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}>
+          <span className="corner tl" />
+          <span className="corner tr" />
+          <span className="corner bl" />
+          <span className="corner br" />
+          {rect.w > 0 && rect.h > 0 && (
+            <span className="dims">{Math.round(rect.w)} × {Math.round(rect.h)}</span>
+          )}
+        </div>
       )}
-      <div className="hint">Drag to select a region — Esc to cancel</div>
+      <div className="hint">
+        <span>Drag to select a region</span>
+        <span className="sep" />
+        <span className="esc">Esc to cancel</span>
+      </div>
     </div>
   )
 }

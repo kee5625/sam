@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { marked } from 'marked'
 import { Recorder } from './recorder'
+import Todo, { type TodoItem } from './Todo'
 import './overlay.css'
 
 // Window is hidden by default (main process). When summoned it renders one of:
-//   type    - text input box (Alt+Space)
-//   listen  - compact "listening" bar, no input (Alt+S, voice)
-//   toast   - brief command confirmation, auto-hides
-// Answers/questions promote listen|type into a full panel with the response.
+//   type    - command bar (+ optional response / suggestion / confirm card)
+//   listen  - compact listening pill (Alt+S, voice)
+//   toast   - brief command confirmation / error, auto-hides
 type Mode = 'type' | 'listen' | 'toast'
 
 interface SaveConfirm {
@@ -24,7 +24,7 @@ interface Suggestion {
 
 function MicIcon(): JSX.Element {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
       <rect x="9" y="2" width="6" height="12" rx="3" />
       <path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4" />
     </svg>
@@ -41,9 +41,34 @@ function StopIcon(): JSX.Element {
 
 function GearIcon(): JSX.Element {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  )
+}
+
+function PlusIcon(): JSX.Element {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  )
+}
+
+function SaveIcon(): JSX.Element {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+      <path d="M17 21v-8H7v8M7 3v5h8" />
+    </svg>
+  )
+}
+
+function XIcon(): JSX.Element {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M18 6L6 18M6 6l12 12" />
     </svg>
   )
 }
@@ -53,6 +78,7 @@ export default function App(): JSX.Element {
   const [listening, setListening] = useState(false)
   const [busy, setBusy] = useState(false)
   const [input, setInput] = useState('')
+  const [lastQuery, setLastQuery] = useState('')
   const [response, setResponse] = useState('')
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
@@ -60,6 +86,9 @@ export default function App(): JSX.Element {
   const [confirm, setConfirm] = useState<SaveConfirm | null>(null)
   const [toastError, setToastError] = useState(false)
   const [suggestions, setSuggestions] = useState<{ query: string; apps: Suggestion[] } | null>(null)
+  const [showTodo, setShowTodo] = useState(false)
+  // UI-only: in-memory todos (no persistence yet)
+  const [todos, setTodos] = useState<TodoItem[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
   const recorder = useRef(new Recorder())
   const interactiveRef = useRef(false)
@@ -67,6 +96,14 @@ export default function App(): JSX.Element {
   const streamedRef = useRef(false)
   const finishingRef = useRef(false)
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Apply the configured accent once on mount
+  useEffect(() => {
+    void window.sam.invoke('config:get').then((c) => {
+      const accent = (c as { accent?: string }).accent === 'green' ? 'green' : 'blue'
+      document.documentElement.setAttribute('data-accent', accent)
+    })
+  }, [])
 
   const setInteractive = useCallback((on: boolean) => {
     if (on === interactiveRef.current) return
@@ -106,6 +143,7 @@ export default function App(): JSX.Element {
 
   const openType = useCallback(() => {
     resetView()
+    setShowTodo(false)
     voiceRef.current = false
     setMode('type')
     setInteractive(true)
@@ -115,7 +153,18 @@ export default function App(): JSX.Element {
 
   const submit = useCallback(async (text: string) => {
     if (!text.trim() || busy) return
+    // "todo" opens the inline panel — handled locally, no backend round-trip
+    if (text.trim().toLowerCase() === 'todo') {
+      resetView()
+      setInput('')
+      setMode('type')
+      setInteractive(true)
+      setShowTodo(true)
+      return
+    }
+    setShowTodo(false)
     setBusy(true)
+    setLastQuery(text.trim())
     setResponse('')
     setError('')
     setStatus('')
@@ -124,7 +173,20 @@ export default function App(): JSX.Element {
     streamedRef.current = false
     await window.sam.invoke('submit', text.trim())
     setBusy(false)
-  }, [busy])
+  }, [busy, resetView, setInteractive])
+
+  const addTodo = useCallback((text: string) => {
+    setTodos((t) => [...t, { id: crypto.randomUUID(), text, done: false }])
+  }, [])
+  const toggleTodo = useCallback((id: string) => {
+    setTodos((t) => t.map((i) => (i.id === id ? { ...i, done: !i.done } : i)))
+  }, [])
+  const editTodo = useCallback((id: string, text: string) => {
+    setTodos((t) => t.map((i) => (i.id === id ? { ...i, text } : i)))
+  }, [])
+  const removeTodo = useCallback((id: string) => {
+    setTodos((t) => t.filter((i) => i.id !== id))
+  }, [])
 
   const finishVoice = useCallback(async () => {
     if (finishingRef.current) return
@@ -135,11 +197,9 @@ export default function App(): JSX.Element {
       const audio = await recorder.current.stop()
       const text = (await window.sam.invoke('voice:transcribe', audio)) as string
       setStatus('')
-      // empty/failed transcription stays compact — no panel pop
       if (!text.trim()) { flashToast("Didn't catch that", true); return }
       await submit(text)
     } catch (e) {
-      // transcription error (mic, Groq, network) — keep it compact, auto-hide
       setStatus('')
       flashToast(e instanceof Error ? e.message : String(e), true)
     }
@@ -164,10 +224,10 @@ export default function App(): JSX.Element {
   }, [resetView, finishVoice, setInteractive])
 
   // Hover-tracked interactivity: window stays click-through; only the visible
-  // pill/panel/bar grabs the mouse, so scroll & clicks elsewhere pass through.
+  // surfaces grab the mouse, so scroll & clicks elsewhere pass through.
   useEffect(() => {
     const onMove = (e: MouseEvent): void => {
-      const over = !!(e.target as HTMLElement).closest?.('.panel, .listening, .toast')
+      const over = !!(e.target as HTMLElement).closest?.('.cmdbar, .card, .listening, .toast, .attachRow')
       setInteractive(over)
     }
     document.addEventListener('mousemove', onMove)
@@ -200,7 +260,6 @@ export default function App(): JSX.Element {
         case 'result':
           setResponse(ev.text as string)
           setStatus('')
-          // voice command (no streamed answer) → flash toast then vanish
           if (voiceRef.current && !streamedRef.current) {
             setMode('toast')
             scheduleHide(1700)
@@ -211,7 +270,6 @@ export default function App(): JSX.Element {
           break
         case 'error':
           setStatus('')
-          // voice-triggered error with no answer yet → compact toast, auto-hide
           if (voiceRef.current && !streamedRef.current) {
             flashToast(ev.text as string, true)
           } else {
@@ -232,6 +290,13 @@ export default function App(): JSX.Element {
           setMode('type')
           setInteractive(true)
           setConfirm(ev as unknown as SaveConfirm)
+          break
+        case 'open-view':
+          if (ev.view === 'todo') {
+            setMode('type')
+            setInteractive(true)
+            setShowTodo(true)
+          }
           break
       }
     })
@@ -256,13 +321,15 @@ export default function App(): JSX.Element {
     return () => { offHotkey(); offEvent(); offSnip(); window.removeEventListener('keydown', onKey) }
   }, [openType, startVoice, finishVoice, listening, hide, resetView, scheduleHide, setInteractive, flashToast])
 
-  // Compact listening bar — voice mode, no Sam panel
+  // Compact listening pill — voice mode
   if (mode === 'listen') {
     return (
       <div className="wrap">
         <div className="listening">
-          <div className="eq"><span /><span /><span /><span /><span /></div>
+          <span className="orb" />
+          <span className="eq"><span /><span /><span /><span /><span /></span>
           <span className="listenLabel">{status || 'Listening…'}</span>
+          <span className="escTag">Esc</span>
         </div>
       </div>
     )
@@ -273,92 +340,149 @@ export default function App(): JSX.Element {
     return (
       <div className="wrap">
         <div className={`toast${toastError ? ' err' : ''}`}>
-          <span className="check">{toastError ? '✕' : '✓'}</span>
+          <span className="badge">{toastError ? '✕' : '✓'}</span>
           <span dangerouslySetInnerHTML={{ __html: marked.parseInline(response) as string }} />
         </div>
       </div>
     )
   }
 
-  // Full panel — typing / answers / snip / suggestions / confirm
+  // Type mode — command bar + optional cards
   return (
     <div className="wrap">
-      <div className="panel">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
         {attached && (
           <div className="attachRow">
             <img className="thumb" src={attached} alt="snip" />
             <button className="clearBtn" onClick={() => { setAttached(null); void window.sam.invoke('image:clear') }}>
-              ✕ clear
+              <XIcon /> Clear
             </button>
           </div>
         )}
-        <div className="inputRow">
+
+        <div className="cmdbar">
+          <span className="orb float" />
           <input
             ref={inputRef}
             value={input}
-            placeholder={attached ? 'Ask about the snip…' : 'Ask anything, or "open spotify"…'}
+            placeholder={attached ? 'Ask about the snip…' : 'Ask anything, or “open spotify”…'}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') void submit(input) }}
           />
           <button
-            className={`micBtn${listening ? ' rec' : ''}`}
+            className={`iconBtn${listening ? ' rec' : ''}`}
             title={listening ? 'Stop' : 'Voice input'}
             onClick={() => (listening ? void finishVoice() : void startVoice())}
           >
             {listening ? <StopIcon /> : <MicIcon />}
           </button>
-          <button className="clearBtn" title="Settings" onClick={() => void window.sam.invoke('settings:open')}>
+          <button className="iconBtn dim" title="Settings" onClick={() => void window.sam.invoke('settings:open')}>
             <GearIcon />
           </button>
         </div>
 
+        {showTodo && (
+          <Todo
+            items={todos}
+            onAdd={addTodo}
+            onToggle={toggleTodo}
+            onEdit={editTodo}
+            onRemove={removeTodo}
+          />
+        )}
+
         {busy && !response && (
-          <div className="dots"><span /><span /><span /></div>
+          <div className="card"><div className="dots"><span /><span /><span /></div></div>
         )}
 
         {response && (
-          <div className="response" dangerouslySetInnerHTML={{ __html: marked.parse(response) as string }} />
+          <div className="card">
+            <div className="cardHead">
+              <span className="orb" />
+              <span className="q">{lastQuery || 'Sam'}</span>
+              <span className="hint">↵ send</span>
+            </div>
+            <div className="response" dangerouslySetInnerHTML={{ __html: marked.parse(response) as string }} />
+          </div>
         )}
 
         {suggestions && (
-          <div className="confirmBox">
-            {suggestions.apps.length > 0 ? (
-              <>
-                No app matched "{suggestions.query}". Did you mean:
-                <div>
-                  {suggestions.apps.map((a) => (
-                    <button key={a.appId} className="sugBtn" onClick={() => void submit(`open ${a.name}`)}>
-                      {a.name}
-                    </button>
-                  ))}
+          <div className="card">
+            <div className="cardHead">
+              <span className="orb" />
+              <span className="q">open {suggestions.query}</span>
+            </div>
+            <div className="sugBody">
+              {suggestions.apps.length > 0 ? (
+                <>
+                  <div className="sugLead">No app matched <b>“{suggestions.query}”</b>. Did you mean:</div>
+                  <div className="chips">
+                    {suggestions.apps.map((a, i) => (
+                      <button
+                        key={a.appId}
+                        className={`chip${i === 0 ? ' primary' : ''}`}
+                        onClick={() => void submit(`open ${a.name}`)}
+                      >
+                        {a.name}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="hintRow">
+                    <PlusIcon />
+                    Not here? Add its .exe under <span className="accent">Settings → Custom apps</span>
+                  </div>
+                </>
+              ) : (
+                <div className="hintRow">
+                  <PlusIcon />
+                  No app called “{suggestions.query}”. Add its .exe under <span className="accent">Settings → Custom apps</span>
                 </div>
-              </>
-            ) : (
-              <>No app called "{suggestions.query}" found. If it's not in the Start Menu, add its .exe under Settings → Custom apps.</>
-            )}
+              )}
+            </div>
           </div>
         )}
 
         {confirm && (
-          <div className="confirmBox">
-            Save session <b>{confirm.name}</b>?
-            {confirm.warning && <div className="error">{confirm.warning}</div>}
-            <ul>
-              {confirm.apps.map((a) => <li key={a}>app: {a}</li>)}
-              {confirm.tabs.flat().map((t) => <li key={t}>tab: {t}</li>)}
-            </ul>
-            <button
-              className="sugBtn"
-              onClick={() => {
-                void window.sam.invoke('session:confirm-save', {
-                  name: confirm.name, apps: confirm.apps, tabs: confirm.tabs
-                })
-                setConfirm(null)
-              }}
-            >
-              Save
-            </button>
-            <button className="sugBtn" onClick={() => setConfirm(null)}>Cancel</button>
+          <div className="card">
+            <div className="confirmBody">
+              <div className="confirmTitle">
+                <SaveIcon />
+                Save session <b style={{ fontWeight: 600 }}>“{confirm.name}”</b>?
+              </div>
+              {confirm.warning && <div className="confirmWarn">{confirm.warning}</div>}
+              <div className="confirmGrid">
+                <div>
+                  <div className="colLabel">Apps · {confirm.apps.length}</div>
+                  <div className="colList">
+                    {confirm.apps.map((a) => (
+                      <div className="colItem" key={a}><span className="bullet" />{a}</div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="colLabel">Tabs · {confirm.tabs.flat().length}</div>
+                  <div className="colList">
+                    {confirm.tabs.flat().map((t) => (
+                      <div className="colItem tab" key={t}><span className="bullet" />{t}</div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="btnRow">
+                <button
+                  className="btnPrimary"
+                  onClick={() => {
+                    void window.sam.invoke('session:confirm-save', {
+                      name: confirm.name, apps: confirm.apps, tabs: confirm.tabs
+                    })
+                    setConfirm(null)
+                  }}
+                >
+                  Save session
+                </button>
+                <button className="btnGhost" onClick={() => setConfirm(null)}>Cancel</button>
+              </div>
+            </div>
           </div>
         )}
 

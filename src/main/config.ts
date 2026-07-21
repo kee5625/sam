@@ -8,7 +8,8 @@ export const DEFAULT_CONFIG: SamConfig = {
   hotkeys: { toggleOverlay: 'Alt+Space', pushToTalk: 'Alt+S', snip: 'Alt+Q' },
   launchAtStartup: false,
   micDeviceId: null,
-  customApps: []
+  customApps: [],
+  accent: 'blue'
 }
 
 export class ConfigStore {

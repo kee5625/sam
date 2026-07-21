@@ -1,14 +1,45 @@
+:root {
+  --accent: #6ea2ff;
+  --glow: rgba(110, 162, 255, 0.4);
+  --on-accent: #0a1230;
+}
+:root[data-accent='green'] {
+  --accent: #3ddc84;
+  --glow: rgba(61, 220, 132, 0.4);
+  --on-accent: #06140d;
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { overflow: hidden; cursor: crosshair; user-select: none; }
+body { overflow: hidden; cursor: crosshair; user-select: none; font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; }
+
 .shot { position: fixed; inset: 0; width: 100vw; height: 100vh; }
-.dim { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); }
+.dim { position: fixed; inset: 0; background: rgba(6, 7, 12, 0.6); }
+
 .rect {
-  position: fixed; border: 1.5px solid #60a5fa;
-  background: rgba(96, 165, 250, 0.15);
-  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);
+  position: fixed;
+  border: 1.5px solid var(--accent);
+  box-shadow: 0 0 0 9999px rgba(6, 7, 12, 0.45), 0 0 22px var(--glow);
+  background: transparent;
 }
+.rect .corner { position: absolute; width: 12px; height: 12px; }
+.rect .tl { left: -1px; top: -1px; border-top: 2px solid var(--accent); border-left: 2px solid var(--accent); }
+.rect .tr { right: -1px; top: -1px; border-top: 2px solid var(--accent); border-right: 2px solid var(--accent); }
+.rect .bl { left: -1px; bottom: -1px; border-bottom: 2px solid var(--accent); border-left: 2px solid var(--accent); }
+.rect .br { right: -1px; bottom: -1px; border-bottom: 2px solid var(--accent); border-right: 2px solid var(--accent); }
+.rect .dims {
+  position: absolute; left: 0; top: -26px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px;
+  padding: 3px 8px; border-radius: 6px;
+  background: var(--accent); color: var(--on-accent); font-weight: 600; white-space: nowrap;
+}
+
 .hint {
-  position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
-  background: rgba(20,22,30,0.85); color: #e8eaf0; padding: 6px 14px;
-  border-radius: 999px; font: 13px 'Segoe UI', sans-serif;
+  position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: 12px;
+  padding: 9px 16px; border-radius: 999px;
+  background: rgba(20, 22, 30, 0.9); backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  font-size: 13px; color: rgba(238, 240, 246, 0.85);
 }
+.hint .sep { width: 1px; height: 14px; background: rgba(255, 255, 255, 0.16); }
+.hint .esc { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; color: rgba(238, 240, 246, 0.55); }

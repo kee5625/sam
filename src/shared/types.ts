@@ -6,6 +6,8 @@ export interface SamConfig {
   micDeviceId: string | null
   /** Apps not in the Start Menu index — launched directly by exe path */
   customApps: { name: string; path: string }[]
+  /** Overlay accent color */
+  accent: 'blue' | 'green'
 }
 
 export interface AppEntry {
@@ -42,3 +44,4 @@ export type AssistantEvent =
   | { kind: 'suggestions'; query: string; apps: AppEntry[] }
   | { kind: 'confirm-save'; name: string; apps: string[]; tabs: string[][]; warning?: string }
   | { kind: 'transcript'; text: string }
+  | { kind: 'open-view'; view: 'todo' }

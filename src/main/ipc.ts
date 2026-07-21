@@ -93,6 +93,11 @@ export function setupIpc(ctx: IpcContext): { config: ConfigStore } {
           : { kind: 'error', text: 'Chrome not found', retryable: false })
         break
       }
+      case 'todo': {
+        // UI-only for now: tell the overlay to open its todo panel.
+        emit({ kind: 'open-view', view: 'todo' })
+        break
+      }
       case 'open_session': {
         const session = sessions.get(intent.name)
         if (!session) {
