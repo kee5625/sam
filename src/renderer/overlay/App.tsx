@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { marked } from 'marked'
 import { Recorder } from './recorder'
-import Todo, { type TodoItem } from './Todo'
+import Todo from './Todo'
+import type { TodoItem } from '../../shared/types'
 import './overlay.css'
 
 // Window is hidden by default (main process). When summoned it renders one of:
@@ -103,8 +104,9 @@ export default function App(): JSX.Element {
   const [toastError, setToastError] = useState(false)
   const [suggestions, setSuggestions] = useState<{ query: string; apps: Suggestion[] } | null>(null)
   const [showTodo, setShowTodo] = useState(false)
-  // UI-only: in-memory todos (no persistence yet)
+  const [todoFilter, setTodoFilter] = useState<string | undefined>(undefined)
   const [todos, setTodos] = useState<TodoItem[]>([])
+  const [quizzing, setQuizzing] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const recorder = useRef(new Recorder())
   const interactiveRef = useRef(false)
@@ -123,6 +125,7 @@ export default function App(): JSX.Element {
     })
   }, [])
   useEffect(() => { applyTheme() }, [applyTheme])
+  useEffect(() => { void refreshTodos() }, [])
 
   const setInteractive = useCallback((on: boolean) => {
     if (on === interactiveRef.current) return
@@ -160,10 +163,20 @@ export default function App(): JSX.Element {
     scheduleHide(isError ? 2600 : 1700)
   }, [scheduleHide])
 
+  // Declared before `submit` — `submit` lists it as a dependency, and dep
+  // arrays are evaluated during render, so a later `const` would be in the TDZ.
+  const refreshTodos = useCallback(async () => {
+    setTodos((await window.sam.invoke('todo:list')) as TodoItem[])
+  }, [])
+
   const openType = useCallback(() => {
     resetView()
     applyTheme()
     setShowTodo(false)
+    setTodoFilter(undefined)
+    // a fresh summon ends any running quiz
+    setQuizzing(false)
+    void window.sam.invoke('quiz:stop')
     // a fresh summon starts clean — drop any snip left attached
     setAttached(null)
     void window.sam.invoke('image:clear')
@@ -177,15 +190,59 @@ export default function App(): JSX.Element {
 
   const submit = useCallback(async (text: string) => {
     if (!text.trim() || busy) return
-    // "todo" opens the inline panel — handled locally, no backend round-trip
-    if (text.trim().toLowerCase() === 'todo') {
+    const raw = text.trim()
+    const lower = raw.toLowerCase()
+
+    // ---- local commands (deterministic, no model round-trip) ----
+
+    // "todo" / "study" / "study ds" -> open the list panel
+    const listCmd = lower.match(/^(todo|todos|study)(?:\s+(.+))?$/)
+    if (listCmd) {
+      const subject = listCmd[2]?.trim()
       resetView()
       setInput('')
       setMode('type')
       setInteractive(true)
+      setTodoFilter(listCmd[1] === 'study' ? subject : undefined)
       setShowTodo(true)
+      void refreshTodos()
       return
     }
+
+    // "quiz me" / "quiz me on ds"
+    const quizCmd = lower.match(/^quiz(?:\s+me)?(?:\s+on\s+(.+))?$/)
+    if (quizCmd) {
+      const subject = quizCmd[1]?.trim()
+      resetView()
+      setInput('')
+      setShowTodo(false)
+      setMode('type')
+      setInteractive(true)
+      setQuizzing(true)
+      setLastQuery(subject ? `quiz · ${subject}` : 'quiz')
+      setBusy(true)
+      await window.sam.invoke('quiz:start', subject)
+      setBusy(false)
+      return
+    }
+
+    // ---- an active quiz swallows input as answers ----
+    if (quizzing) {
+      if (/^(stop|end|done|exit|quit)$/.test(lower)) {
+        void window.sam.invoke('quiz:stop')
+        setQuizzing(false)
+        setInput('')
+        setResponse('')
+        return
+      }
+      setBusy(true)
+      setInput('')
+      setResponse('')
+      await window.sam.invoke('quiz:reply', raw)
+      setBusy(false)
+      return
+    }
+
     setShowTodo(false)
     setBusy(true)
     setLastQuery(text.trim())
@@ -195,21 +252,25 @@ export default function App(): JSX.Element {
     setSuggestions(null)
     setInput('')
     streamedRef.current = false
-    await window.sam.invoke('submit', text.trim())
+    await window.sam.invoke('submit', raw)
     setBusy(false)
-  }, [busy, resetView, setInteractive])
+  }, [busy, resetView, setInteractive, quizzing, refreshTodos])
 
-  const addTodo = useCallback((text: string) => {
-    setTodos((t) => [...t, { id: crypto.randomUUID(), text, done: false }])
-  }, [])
+  const addTodo = useCallback((text: string, subject?: string) => {
+    void window.sam.invoke('todo:add', text, subject).then(refreshTodos)
+  }, [refreshTodos])
   const toggleTodo = useCallback((id: string) => {
-    setTodos((t) => t.map((i) => (i.id === id ? { ...i, done: !i.done } : i)))
-  }, [])
+    const item = todos.find((i) => i.id === id)
+    if (!item) return
+    void window.sam.invoke('todo:update', id, { done: !item.done })
+      .then((list) => setTodos(list as TodoItem[]))
+  }, [todos])
   const editTodo = useCallback((id: string, text: string) => {
-    setTodos((t) => t.map((i) => (i.id === id ? { ...i, text } : i)))
+    void window.sam.invoke('todo:update', id, { text })
+      .then((list) => setTodos(list as TodoItem[]))
   }, [])
   const removeTodo = useCallback((id: string) => {
-    setTodos((t) => t.filter((i) => i.id !== id))
+    void window.sam.invoke('todo:remove', id).then((list) => setTodos(list as TodoItem[]))
   }, [])
 
   const finishVoice = useCallback(async () => {
@@ -330,6 +391,8 @@ export default function App(): JSX.Element {
     const offHidden = window.sam.on('overlay:hidden', () => {
       resetView()
       setShowTodo(false)
+      setQuizzing(false)
+      void window.sam.invoke('quiz:stop')
       setMode('type')
       interactiveRef.current = false
     })
@@ -398,7 +461,11 @@ export default function App(): JSX.Element {
           <input
             ref={inputRef}
             value={input}
-            placeholder={attached ? 'Ask about the snip…' : 'Ask anything, or “open spotify”…'}
+            placeholder={
+              quizzing ? 'Your answer… ("stop" to end)'
+                : attached ? 'Ask about the snip…'
+                  : 'Ask anything, or “open spotify”…'
+            }
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') void submit(input) }}
           />
@@ -417,6 +484,7 @@ export default function App(): JSX.Element {
         {showTodo && (
           <Todo
             items={todos}
+            filter={todoFilter}
             onAdd={addTodo}
             onToggle={toggleTodo}
             onEdit={editTodo}

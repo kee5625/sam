@@ -7,6 +7,7 @@ describe('looksLikeCommand', () => {
     for (const t of [
       'open spotify', 'Open Spotify.', 'launch vs code', 'start work mode',
       'please open chrome', 'hey sam, open discord', 'can you open notepad',
+      'can you open spotify?', 'could you launch discord',
       'go to leetcode.com', 'save this as work mode', 'close spotify'
     ]) expect(looksLikeCommand(t), t).toBe(true)
   })
@@ -120,9 +121,10 @@ describe('parseIntent', () => {
       captured = { messages: messages as { role: string; content: string }[], tools }
       return { content: 'x', toolCall: null }
     }
-    await parseIntent('hi', chat)
+    // must be a command, otherwise the shape gate short-circuits the model
+    await parseIntent('open spotify', chat)
     expect(captured!.tools).toBe(INTENT_TOOLS)
     expect(captured!.messages).toHaveLength(2)
-    expect(captured!.messages[1]).toEqual({ role: 'user', content: 'hi' })
+    expect(captured!.messages[1]).toEqual({ role: 'user', content: 'open spotify' })
   })
 })

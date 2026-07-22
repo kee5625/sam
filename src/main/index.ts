@@ -24,6 +24,19 @@ app.whenReady().then(() => {
 
   overlay = createOverlayWindow()
 
+  // Surface renderer failures — a dead overlay renderer silently swallows the
+  // toggle/push-to-talk hotkeys (they only send IPC), while Alt+Q still works
+  // because the snip runs entirely in the main process.
+  overlay.webContents.on('render-process-gone', (_e, d) =>
+    console.error('[sam] overlay renderer gone:', d.reason))
+  overlay.webContents.on('preload-error', (_e, path, err) =>
+    console.error('[sam] preload failed:', path, err))
+  overlay.webContents.on('console-message', (_e, level, message) => {
+    if (level >= 2) console.error('[sam] overlay console:', message)
+  })
+  overlay.webContents.once('did-finish-load', () => console.log('[sam] overlay renderer ready'))
+  if (process.env['SAM_DEBUG'] === '1') overlay.webContents.openDevTools({ mode: 'detach' })
+
   const openSnip = async (): Promise<void> => {
     if (snip) return
     const screenshot = await captureScreen()
@@ -55,8 +68,10 @@ app.whenReady().then(() => {
   })
 
   function doRegister(): string[] {
-    return registerHotkeys(config.load().hotkeys, {
+    const bindings = config.load().hotkeys
+    const failed = registerHotkeys(bindings, {
       toggleOverlay: () => {
+        console.log('[sam] hotkey: toggleOverlay')
         if (!overlay) return
         // Alt+Space toggles: hide if showing, else summon the type box
         if (overlay.isVisible()) {
@@ -70,12 +85,18 @@ app.whenReady().then(() => {
         }
       },
       pushToTalk: () => {
+        console.log('[sam] hotkey: pushToTalk')
         if (!overlay) return
         overlay.show()
         overlay.webContents.send('hotkey', 'pushToTalk')
       },
-      snip: () => void openSnip()
+      snip: () => {
+        console.log('[sam] hotkey: snip')
+        void openSnip()
+      }
     })
+    console.log('[sam] hotkeys registered:', bindings, failed.length ? `FAILED: ${failed.join(', ')}` : 'all ok')
+    return failed
   }
 
   const failed = doRegister()

@@ -7,6 +7,8 @@ import { launchApp } from './launcher'
 import { listVisibleApps } from './processes'
 import { readOpenTabs, openTabGroup } from './chrome'
 import { SessionStore, captureSetup, openSession, type SessionDeps } from './sessions'
+import { TodoStore } from './todo'
+import { startQuizMessages, QUIZ_SYSTEM } from './quiz'
 import { History } from './history'
 import { captureScreen } from './capture'
 import { GroqClient } from './ai/groq'
@@ -27,7 +29,10 @@ export function setupIpc(ctx: IpcContext): { config: ConfigStore } {
   const dataDir = app.getPath('userData')
   const config = new ConfigStore(dataDir)
   const sessions = new SessionStore(join(dataDir, 'sessions.json'))
+  const todos = new TodoStore(join(dataDir, 'todos.json'))
   const history = new History(join(dataDir, 'history.json'))
+  /** Running quiz conversation, if any. */
+  let quiz: ChatMessage[] | null = null
 
   let groq = new GroqClient(config.load().groqApiKey)
   let openai = new OpenAIClient(config.load().openaiApiKey)
@@ -182,6 +187,63 @@ export function setupIpc(ctx: IpcContext): { config: ConfigStore } {
     sessions.save(payload.name, { apps: payload.apps, tabs: payload.tabs })
     emit({ kind: 'result', text: `Session **${payload.name}** saved` })
   })
+
+  // ---- Todos / study list ----
+  ipcMain.handle('todo:list', () => todos.list())
+  ipcMain.handle('todo:subjects', () => todos.subjects())
+  ipcMain.handle('todo:add', (_e, text: string, subject?: string) => todos.add(text, subject))
+  ipcMain.handle('todo:update', (_e, id: string, patch: Record<string, unknown>) => {
+    todos.update(id, patch)
+    return todos.list()
+  })
+  ipcMain.handle('todo:remove', (_e, id: string) => {
+    todos.remove(id)
+    return todos.list()
+  })
+  ipcMain.handle('todo:clear-done', (_e, subject?: string) => {
+    todos.clearDone(subject)
+    return todos.list()
+  })
+
+  // ---- Quiz ----
+  /** Streams the assistant's next quiz turn to the overlay. */
+  async function streamQuiz(): Promise<void> {
+    let answer = ''
+    await router.chatStream(quiz!, (t) => {
+      answer += t
+      emit({ kind: 'token', text: t })
+    })
+    quiz!.push({ role: 'assistant', content: answer })
+    emit({ kind: 'done' })
+  }
+
+  ipcMain.handle('quiz:start', async (_e, subject?: string) => {
+    try {
+      const topics = (subject ? todos.bySubject(subject) : todos.list())
+        .filter((i) => !i.done)
+        .map((i) => i.text)
+      quiz = startQuizMessages(subject, topics)
+      emit({ kind: 'status', text: subject ? `Quizzing on ${subject}…` : 'Quizzing…' })
+      await streamQuiz()
+    } catch (e) {
+      quiz = null
+      emit({ kind: 'error', text: e instanceof Error ? e.message : String(e), retryable: true })
+    }
+  })
+
+  ipcMain.handle('quiz:reply', async (_e, text: string) => {
+    if (!quiz) return
+    try {
+      quiz.push({ role: 'user', content: text })
+      // keep the transcript bounded: system prompt + last 12 turns
+      if (quiz.length > 13) quiz = [{ role: 'system', content: QUIZ_SYSTEM }, ...quiz.slice(-12)]
+      await streamQuiz()
+    } catch (e) {
+      emit({ kind: 'error', text: e instanceof Error ? e.message : String(e), retryable: true })
+    }
+  })
+
+  ipcMain.handle('quiz:stop', () => { quiz = null })
 
   ipcMain.handle('sessions:list', () => {
     const out: Record<string, unknown> = {}

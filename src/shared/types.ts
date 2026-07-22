@@ -17,6 +17,15 @@ export interface AppEntry {
   appId: string
 }
 
+export interface TodoItem {
+  id: string
+  text: string
+  /** Optional grouping — a course/subject for study items ("ds", "os") */
+  subject?: string
+  done: boolean
+  created: string
+}
+
 export interface Session {
   apps: string[]
   tabs: string[][]

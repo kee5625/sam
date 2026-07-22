@@ -3,6 +3,9 @@ import { join } from 'path'
 
 const preload = join(__dirname, '../preload/index.js')
 
+/** Devtools stay off unless SAM_DEBUG=1, so normal use has no browser chrome. */
+const devTools = process.env['SAM_DEBUG'] === '1'
+
 function load(win: BrowserWindow, page: 'overlay' | 'snip' | 'settings'): void {
   if (process.env['ELECTRON_RENDERER_URL']) {
     // vite renderer root is src/renderer, so pages are served at /<page>/index.html
@@ -30,7 +33,7 @@ export function createOverlayWindow(): BrowserWindow {
     alwaysOnTop: true,
     hasShadow: false,
     show: false,
-    webPreferences: { preload, devTools: false }
+    webPreferences: { preload, devTools }
   })
   win.setAlwaysOnTop(true, 'screen-saver')
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
@@ -54,7 +57,7 @@ export function createSnipWindow(): BrowserWindow {
     skipTaskbar: true,
     alwaysOnTop: true,
     fullscreen: true,
-    webPreferences: { preload, devTools: false }
+    webPreferences: { preload, devTools }
   })
   win.setAlwaysOnTop(true, 'screen-saver')
   load(win, 'snip')
@@ -70,7 +73,7 @@ export function createSettingsWindow(): BrowserWindow {
     title: 'Sam Settings',
     frame: false,
     backgroundColor: '#15171f',
-    webPreferences: { preload, devTools: false }
+    webPreferences: { preload, devTools }
   })
   load(win, 'settings')
   return win

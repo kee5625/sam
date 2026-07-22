@@ -79,8 +79,15 @@ export type IntentChatFn = (
 const QUESTION_SHAPE =
   /^(what|whats|what's|how|why|who|whom|whose|when|where|which|is|are|am|was|were|do|does|did|can|could|should|would|will|tell me|explain|define|help me understand)\b/i
 
-/** Optional filler before the verb: "please open x", "hey sam, open x". */
-const LEAD_FILLER = String.raw`(?:(?:please|pls|plz|hey\s+sam|ok\s+sam|sam|can\s+you|could\s+you|would\s+you|go\s+ahead\s+and)[,\s]+)*`
+/** Optional filler before the verb: "please open x", "can you open x". */
+const FILLER_WORDS = String.raw`please|pls|plz|hey\s+sam|ok\s+sam|sam|can\s+you|could\s+you|would\s+you|go\s+ahead\s+and`
+const LEAD_FILLER = String.raw`(?:(?:${FILLER_WORDS})[,\s]+)*`
+
+/**
+ * A polite lead-in ("can you open notepad?") is still a command, so it must
+ * bypass the question-shape checks that would otherwise reject "can …".
+ */
+const POLITE_PREFIX = new RegExp(String.raw`^\s*(?:${FILLER_WORDS})[,\s]+`, 'i')
 
 const COMMAND_VERB = String.raw`(?:open|launch|start|run|execute|go\s*to|goto|pull\s*up|bring\s*up|switch\s*to|save|close|quit|exit)`
 
@@ -98,8 +105,11 @@ const VERB_IN_NOUN_PHRASE =
 export function looksLikeCommand(text: string): boolean {
   const t = text.trim()
   if (!t) return false
-  if (t.endsWith('?')) return false
-  if (QUESTION_SHAPE.test(t)) return false
+  const polite = POLITE_PREFIX.test(t)
+  // "can you open spotify?" reads as a question but is a command; only apply
+  // the question filters when there's no polite lead-in.
+  if (!polite && t.endsWith('?')) return false
+  if (!polite && QUESTION_SHAPE.test(t)) return false
   if (!IMPERATIVE.test(t)) return false
   // "open source is great" leads with a verb but isn't a command
   if (VERB_IN_NOUN_PHRASE.test(t) && !/^\s*open\s+\S+\s*$/i.test(t)) return false

@@ -313,7 +313,33 @@ body {
 .todoEmptyHint { font-size: 12.5px; color: var(--text-mute); max-width: 300px; line-height: 1.5; }
 .todoEmptyHint .kbd { font-family: 'JetBrains Mono', ui-monospace, monospace; color: var(--text-dim); }
 
-.todoList { border-top: 1px solid var(--divider); padding: 8px 8px 10px; }
+.todoList { border-top: 1px solid var(--divider); padding: 8px 8px 10px; max-height: 340px; overflow-y: auto; }
+.todoList::-webkit-scrollbar { width: 8px; }
+.todoList::-webkit-scrollbar-thumb { background: var(--scroll); border-radius: 4px; }
+/* Collapsible subject group header */
+.subjectHeader {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 8px 10px; margin-top: 2px;
+  background: none; border: none; border-radius: 8px;
+  cursor: pointer; font-family: inherit; text-align: left;
+  transition: background 0.12s ease;
+}
+.subjectHeader:hover { background: var(--btn-bg); }
+.subjectHeader .chev {
+  display: inline-flex; color: var(--accent);
+  transition: transform 0.16s ease;
+}
+.subjectHeader.collapsed .chev { transform: rotate(-90deg); }
+.subjectHeader .subjectName {
+  flex: 1;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--accent);
+}
+.subjectHeader .subjectCount {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10.5px; color: var(--text-mute);
+}
 .todoItem {
   display: flex; align-items: center; gap: 11px;
   padding: 9px 10px; border-radius: 10px; border: 1px solid transparent;
