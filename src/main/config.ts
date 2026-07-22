@@ -9,7 +9,8 @@ export const DEFAULT_CONFIG: SamConfig = {
   launchAtStartup: false,
   micDeviceId: null,
   customApps: [],
-  accent: 'blue'
+  accent: 'blue',
+  theme: 'dark'
 }
 
 export class ConfigStore {

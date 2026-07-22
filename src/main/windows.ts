@@ -30,7 +30,7 @@ export function createOverlayWindow(): BrowserWindow {
     alwaysOnTop: true,
     hasShadow: false,
     show: false,
-    webPreferences: { preload }
+    webPreferences: { preload, devTools: false }
   })
   win.setAlwaysOnTop(true, 'screen-saver')
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
@@ -54,7 +54,7 @@ export function createSnipWindow(): BrowserWindow {
     skipTaskbar: true,
     alwaysOnTop: true,
     fullscreen: true,
-    webPreferences: { preload }
+    webPreferences: { preload, devTools: false }
   })
   win.setAlwaysOnTop(true, 'screen-saver')
   load(win, 'snip')
@@ -63,10 +63,14 @@ export function createSnipWindow(): BrowserWindow {
 
 export function createSettingsWindow(): BrowserWindow {
   const win = new BrowserWindow({
-    width: 760,
-    height: 640,
+    width: 940,
+    height: 660,
+    minWidth: 720,
+    minHeight: 520,
     title: 'Sam Settings',
-    webPreferences: { preload }
+    frame: false,
+    backgroundColor: '#15171f',
+    webPreferences: { preload, devTools: false }
   })
   load(win, 'settings')
   return win

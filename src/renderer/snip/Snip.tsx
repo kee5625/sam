@@ -11,8 +11,9 @@ export default function Snip(): JSX.Element {
 
   useEffect(() => {
     void window.sam.invoke('config:get').then((c) => {
-      const accent = (c as { accent?: string }).accent === 'green' ? 'green' : 'blue'
-      document.documentElement.setAttribute('data-accent', accent)
+      const cfg = c as { accent?: string; theme?: string }
+      document.documentElement.setAttribute('data-accent', cfg.accent === 'green' ? 'green' : 'blue')
+      document.documentElement.setAttribute('data-theme', cfg.theme === 'light' ? 'light' : 'dark')
     })
     const off = window.sam.on('snip:show', (...args: unknown[]) => setShot(args[0] as string))
     const onKey = (e: KeyboardEvent): void => {

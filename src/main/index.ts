@@ -1,4 +1,4 @@
-import { app, BrowserWindow, session, globalShortcut } from 'electron'
+import { app, BrowserWindow, session, globalShortcut, Menu } from 'electron'
 import { createOverlayWindow, createSnipWindow, createSettingsWindow } from './windows'
 import { registerHotkeys } from './hotkeys'
 import { setupIpc } from './ipc'
@@ -11,6 +11,10 @@ process.on('uncaughtException', (e) => console.error('[sam] uncaught:', e))
 let overlay: BrowserWindow | null = null
 let snip: BrowserWindow | null = null
 let settings: BrowserWindow | null = null
+
+// No application menu — kills the File/Edit/View/Window bar and its
+// accelerators (including the devtools shortcut).
+Menu.setApplicationMenu(null)
 
 app.whenReady().then(() => {
   // Auto-grant mic access for our own renderer
@@ -57,6 +61,9 @@ app.whenReady().then(() => {
         // Alt+Space toggles: hide if showing, else summon the type box
         if (overlay.isVisible()) {
           overlay.hide()
+          // let the renderer drop stale state so the next open isn't a flash
+          // of the previous toast/response
+          overlay.webContents.send('overlay:hidden')
         } else {
           overlay.show()
           overlay.webContents.send('hotkey', 'toggleOverlay')

@@ -8,6 +8,8 @@ export interface SamConfig {
   customApps: { name: string; path: string }[]
   /** Overlay accent color */
   accent: 'blue' | 'green'
+  /** UI theme */
+  theme: 'dark' | 'light'
 }
 
 export interface AppEntry {

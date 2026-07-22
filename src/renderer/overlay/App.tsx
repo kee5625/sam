@@ -73,6 +73,22 @@ function XIcon(): JSX.Element {
   )
 }
 
+function CheckBadgeIcon(): JSX.Element {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 6L9 17l-5-5" />
+    </svg>
+  )
+}
+
+function XBadgeIcon(): JSX.Element {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round">
+      <path d="M18 6L6 18M6 6l12 12" />
+    </svg>
+  )
+}
+
 export default function App(): JSX.Element {
   const [mode, setMode] = useState<Mode>('type')
   const [listening, setListening] = useState(false)
@@ -97,13 +113,16 @@ export default function App(): JSX.Element {
   const finishingRef = useRef(false)
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Apply the configured accent once on mount
-  useEffect(() => {
+  // Apply the configured accent + theme (re-read on every summon so a change
+  // in settings takes effect the next time the overlay opens)
+  const applyTheme = useCallback(() => {
     void window.sam.invoke('config:get').then((c) => {
-      const accent = (c as { accent?: string }).accent === 'green' ? 'green' : 'blue'
-      document.documentElement.setAttribute('data-accent', accent)
+      const cfg = c as { accent?: string; theme?: string }
+      document.documentElement.setAttribute('data-accent', cfg.accent === 'green' ? 'green' : 'blue')
+      document.documentElement.setAttribute('data-theme', cfg.theme === 'light' ? 'light' : 'dark')
     })
   }, [])
+  useEffect(() => { applyTheme() }, [applyTheme])
 
   const setInteractive = useCallback((on: boolean) => {
     if (on === interactiveRef.current) return
@@ -143,13 +162,18 @@ export default function App(): JSX.Element {
 
   const openType = useCallback(() => {
     resetView()
+    applyTheme()
     setShowTodo(false)
+    // a fresh summon starts clean — drop any snip left attached
+    setAttached(null)
+    void window.sam.invoke('image:clear')
+    setInput('')
     voiceRef.current = false
     setMode('type')
     setInteractive(true)
     void window.sam.invoke('overlay:focus')
     setTimeout(() => inputRef.current?.focus(), 50)
-  }, [resetView, setInteractive])
+  }, [resetView, setInteractive, applyTheme])
 
   const submit = useCallback(async (text: string) => {
     if (!text.trim() || busy) return
@@ -301,6 +325,15 @@ export default function App(): JSX.Element {
       }
     })
 
+    // main hid the window (Alt+Space toggle) — drop stale state so the next
+    // summon doesn't flash the previous toast/response for a frame
+    const offHidden = window.sam.on('overlay:hidden', () => {
+      resetView()
+      setShowTodo(false)
+      setMode('type')
+      interactiveRef.current = false
+    })
+
     const offSnip = window.sam.on('snip:attached', (...args: unknown[]) => {
       resetView()
       voiceRef.current = false
@@ -318,7 +351,7 @@ export default function App(): JSX.Element {
       }
     }
     window.addEventListener('keydown', onKey)
-    return () => { offHotkey(); offEvent(); offSnip(); window.removeEventListener('keydown', onKey) }
+    return () => { offHotkey(); offEvent(); offSnip(); offHidden(); window.removeEventListener('keydown', onKey) }
   }, [openType, startVoice, finishVoice, listening, hide, resetView, scheduleHide, setInteractive, flashToast])
 
   // Compact listening pill — voice mode
@@ -340,7 +373,7 @@ export default function App(): JSX.Element {
     return (
       <div className="wrap">
         <div className={`toast${toastError ? ' err' : ''}`}>
-          <span className="badge">{toastError ? '✕' : '✓'}</span>
+          <span className="badge">{toastError ? <XBadgeIcon /> : <CheckBadgeIcon />}</span>
           <span dangerouslySetInnerHTML={{ __html: marked.parseInline(response) as string }} />
         </div>
       </div>
@@ -391,18 +424,18 @@ export default function App(): JSX.Element {
           />
         )}
 
-        {busy && !response && (
-          <div className="card"><div className="dots"><span /><span /><span /></div></div>
-        )}
-
-        {response && (
+        {(busy || response) && (
           <div className="card">
             <div className="cardHead">
               <span className="orb" />
               <span className="q">{lastQuery || 'Sam'}</span>
               <span className="hint">↵ send</span>
             </div>
-            <div className="response" dangerouslySetInnerHTML={{ __html: marked.parse(response) as string }} />
+            {response ? (
+              <div className="response" dangerouslySetInnerHTML={{ __html: marked.parse(response) as string }} />
+            ) : (
+              <div className="response thinking"><div className="dots"><span /><span /><span /></div></div>
+            )}
           </div>
         )}
 

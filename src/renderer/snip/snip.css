@@ -8,6 +8,8 @@
   --glow: rgba(61, 220, 132, 0.4);
   --on-accent: #06140d;
 }
+:root[data-theme='light'] { --accent: #3b6ef0; --glow: rgba(59, 110, 240, 0.35); --on-accent: #fff; }
+:root[data-theme='light'][data-accent='green'] { --accent: #17a35f; --glow: rgba(23, 163, 95, 0.35); --on-accent: #fff; }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { overflow: hidden; cursor: crosshair; user-select: none; font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; }

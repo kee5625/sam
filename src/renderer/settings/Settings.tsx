@@ -9,6 +9,7 @@ interface Cfg {
   micDeviceId: string | null
   customApps: { name: string; path: string }[]
   accent: 'blue' | 'green'
+  theme: 'dark' | 'light'
 }
 
 interface SessionData { apps: string[]; tabs: string[][] }
@@ -60,6 +61,7 @@ export default function Settings(): JSX.Element {
       const k = c as Cfg
       setCfg(k)
       document.documentElement.setAttribute('data-accent', k.accent === 'green' ? 'green' : 'blue')
+      document.documentElement.setAttribute('data-theme', k.theme === 'light' ? 'light' : 'dark')
     })
     void window.sam.invoke('sessions:list').then((s) => setSessions(s as Record<string, SessionData>))
     void navigator.mediaDevices.enumerateDevices().then((devs) =>
@@ -69,7 +71,13 @@ export default function Settings(): JSX.Element {
 
   if (!cfg) return <div className="win"><div className="content">Loading…</div></div>
 
-  const update = (patch: Partial<Cfg>): void => setCfg({ ...cfg, ...patch })
+  const update = (patch: Partial<Cfg>): void => {
+    const next = { ...cfg, ...patch }
+    setCfg(next)
+    // live preview of look-and-feel changes
+    if (patch.accent) document.documentElement.setAttribute('data-accent', patch.accent)
+    if (patch.theme) document.documentElement.setAttribute('data-theme', patch.theme)
+  }
 
   async function save(): Promise<void> {
     if (!cfg) return
@@ -77,6 +85,7 @@ export default function Settings(): JSX.Element {
     const failed = (await window.sam.invoke('config:set', cleaned)) as string[]
     setCfg(cleaned)
     document.documentElement.setAttribute('data-accent', cleaned.accent)
+    document.documentElement.setAttribute('data-theme', cleaned.theme)
     setFailedKeys(failed)
     setMsg(failed.length ? 'Hotkey conflict — see Hotkeys' : 'Saved')
     setTimeout(() => setMsg(''), 2500)
@@ -102,6 +111,14 @@ export default function Settings(): JSX.Element {
       <div className="titlebar">
         <span className="orb" />
         <span className="title">Sam — Settings</span>
+        <div className="winBtns">
+          <button className="winBtn" title="Minimize" onClick={() => void window.sam.invoke('win:minimize')}>
+            <svg width="12" height="12" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M5 12h14" /></svg>
+          </button>
+          <button className="winBtn close" title="Close" onClick={() => void window.sam.invoke('win:close')}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
+          </button>
+        </div>
       </div>
 
       <div className="body">
@@ -173,6 +190,10 @@ export default function Settings(): JSX.Element {
                     <option value="green">Green</option>
                   </select>
                 </div>
+              </div>
+              <div className="switchRow" onClick={() => update({ theme: cfg.theme === 'light' ? 'dark' : 'light' })}>
+                <span className={`switch${cfg.theme === 'light' ? ' on' : ''}`}><span className="knob" /></span>
+                <span className="switchLabel">Light mode</span>
               </div>
               <div className="switchRow" onClick={() => update({ launchAtStartup: !cfg.launchAtStartup })}>
                 <span className={`switch${cfg.launchAtStartup ? ' on' : ''}`}><span className="knob" /></span>

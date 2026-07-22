@@ -134,6 +134,7 @@ export function setupIpc(ctx: IpcContext): { config: ConfigStore } {
           answer += t
           emit({ kind: 'token', text: t })
         })
+        history.add('user', originalText)
         history.add('assistant', answer)
         break
       }
@@ -142,10 +143,11 @@ export function setupIpc(ctx: IpcContext): { config: ConfigStore } {
 
   ipcMain.handle('submit', async (_e, text: string) => {
     try {
-      // snapshot history BEFORE adding the new message, so the model
-      // doesn't see the current question twice
+      // Snapshot before recording, so the model never sees the current
+      // message twice. Only conversational turns get recorded (see below) —
+      // commands like "open spotify" are actions, not chat context, and
+      // recording them made later messages inherit their entities.
       const past = history.recent(6)
-      history.add('user', text)
       if (attachedImage) {
         if (!openai.hasKey()) {
           emit({ kind: 'error', text: 'OpenAI key needed for screen questions — open settings', retryable: false })
@@ -156,11 +158,12 @@ export function setupIpc(ctx: IpcContext): { config: ConfigStore } {
           answer += t
           emit({ kind: 'token', text: t })
         })
+        history.add('user', text)
         history.add('assistant', answer)
         emit({ kind: 'done' })
         return
       }
-      const intent = await parseIntent(text, past, (m, tools) =>
+      const intent = await parseIntent(text, (m, tools) =>
         router.chat(m, tools ?? INTENT_TOOLS)
       )
       await executeIntent(intent, text, past)
@@ -203,7 +206,14 @@ export function setupIpc(ctx: IpcContext): { config: ConfigStore } {
 
   ipcMain.handle('overlay:focus', () => ctx.overlay.focus())
 
-  ipcMain.handle('overlay:hide', () => ctx.overlay.hide())
+  ipcMain.handle('overlay:hide', () => {
+    ctx.overlay.hide()
+    ctx.overlay.webContents.send('overlay:hidden')
+  })
+
+  // Window controls for frameless windows (settings)
+  ipcMain.handle('win:minimize', (e) => BrowserWindow.fromWebContents(e.sender)?.minimize())
+  ipcMain.handle('win:close', (e) => BrowserWindow.fromWebContents(e.sender)?.close())
 
   ipcMain.handle('image:clear', () => { attachedImage = null })
 
